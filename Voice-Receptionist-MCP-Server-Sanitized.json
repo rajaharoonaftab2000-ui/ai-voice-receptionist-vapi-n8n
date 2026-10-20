@@ -1,0 +1,1194 @@
+{
+  "name": "Voice Receptionist MCP Server",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "voice-receptionist-mcp-example",
+        "instructions": "You are a hospital voice receptionist assistant. Follow this tool-use order:\n\n(1) Call get_current_date first whenever the caller uses relative dates like \"today\", \"tomorrow\", \"Wednesday\", or \"next week\" — you need the exact ISO date before checking availability.\n\n(2) Call check_availability to verify the requested time slot is free. IMPORTANT: This hospital uses ONE single shared Google Calendar (calendar_id is ALWAYS \"primary\") for ALL doctors and ALL departments. There are NO doctor-specific calendars. If the calendar shows no conflicting events in the requested time window, the slot IS available for ANY doctor — do not say you cannot find the doctor's specific availability. Proceed to step 3.\n\n(3) Call book_appointment immediately after confirming the slot is free. Always book if check_availability shows no conflict. Do NOT ask the caller if they want to proceed — just confirm and book. Pass all patient details (name, phone, reason, urgency) along with the booking.\n\n(4) Always call log_booking at the end of every call to record the interaction.\n\n(5) Use hospital_knowledge_base for any questions about the hospital — departments, doctors, visiting hours, location, insurance, or services. Do NOT use calendar IDs from the knowledge base for booking; always use \"primary\"."
+      },
+      "id": "7beae117-4831-50a1-9991-5162207dbb19",
+      "name": "MCP Server Trigger",
+      "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+      "typeVersion": 2.1,
+      "position": [
+        -1120,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Returns the current date and time in ISO 8601 format. Always call this first when the caller uses relative date expressions like \"today\", \"tomorrow\", \"next Monday\", or \"this week\", so you can calculate the exact calendar date before checking availability or booking.",
+        "jsCode": "const now = new Date(); const offset = 5 * 60 * 60 * 1000; const pkt = new Date(now.getTime() + offset); return pkt.toISOString().replace('Z', '+05:00');"
+      },
+      "id": "d5f2b718-7164-5be9-ae9b-80c6b21401f0",
+      "name": "get_current_date",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        -1344,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "name": "check_availability",
+        "description": "Fetches events from the hospital shared Google Calendar between a given start and end datetime. Use this to check if a time slot is free before booking an appointment. The hospital uses ONE single shared calendar (calendar_id is always \"primary\") for ALL doctors and departments — there are no doctor-specific calendars. If the result contains no conflicting events in the requested window, the slot is AVAILABLE — proceed directly to book_appointment for ANY doctor. Do NOT look for doctor-specific calendars or fail if you cannot verify a specific doctor's individual calendar; if the shared calendar is free, the appointment can be booked.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_TOOL_WORKFLOW_ID"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "operation": "check_availability",
+            "calendar_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('calendar_id', 'Google Calendar ID to query. Always use \"primary\" — this hospital uses a single shared calendar for all departments and all doctors. Never use doctor-specific IDs.', 'string') }}",
+            "start_time": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('start_time', 'Start of the window to check in ISO 8601 format, e.g. 2024-09-07T09:00:00', 'string') }}",
+            "end_time": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('end_time', 'End of the window to check in ISO 8601 format, e.g. 2024-09-07T10:00:00', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "operation",
+              "displayName": "operation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "calendar_id",
+              "displayName": "calendar_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "start_time",
+              "displayName": "start_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "end_time",
+              "displayName": "end_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_title",
+              "displayName": "event_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "caller_name",
+              "displayName": "caller_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "phone_number",
+              "displayName": "phone_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reason_for_visit",
+              "displayName": "reason_for_visit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "urgency_level",
+              "displayName": "urgency_level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "appointment_datetime",
+              "displayName": "appointment_datetime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "5168003a-f3bc-500e-aa0f-1a6f204849e7",
+      "name": "check_availability",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.1,
+      "position": [
+        -1184,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "name": "log_booking",
+        "description": "Logs or updates a call record in Google Sheets. Call this after every interaction to record caller name, phone number, reason for visit, urgency level, appointment date/time, and status. If the phone number already exists as a row, it will be updated; otherwise a new row is appended. Use status \"pending\" when no appointment has been booked yet.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_TOOL_WORKFLOW_ID"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "operation": "log_booking",
+            "caller_name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('caller_name', 'Full name of the caller or patient', 'string') }}",
+            "phone_number": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('phone_number', 'Caller phone number — used as the unique row key to detect updates', 'string') }}",
+            "reason_for_visit": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('reason_for_visit', 'Reason the caller is contacting the hospital', 'string') }}",
+            "urgency_level": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('urgency_level', 'Urgency of the visit: low, medium, high, or emergency', 'string') }}",
+            "appointment_datetime": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('appointment_datetime', 'Scheduled appointment date and time in ISO 8601 format, or empty string if not yet booked', 'string') }}",
+            "status": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('status', 'Booking status: pending, confirmed, cancelled, or completed', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "operation",
+              "displayName": "operation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "calendar_id",
+              "displayName": "calendar_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "start_time",
+              "displayName": "start_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "end_time",
+              "displayName": "end_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_title",
+              "displayName": "event_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "caller_name",
+              "displayName": "caller_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "phone_number",
+              "displayName": "phone_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reason_for_visit",
+              "displayName": "reason_for_visit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "urgency_level",
+              "displayName": "urgency_level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "appointment_datetime",
+              "displayName": "appointment_datetime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "1a5cd0b5-7787-5a38-bf0e-ba828743c9a8",
+      "name": "log_booking",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.1,
+      "position": [
+        -1056,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "name": "book_appointment",
+        "description": "Creates a new appointment event on Google Calendar. Only call this after confirming the time slot is free using check_availability. Provide: calendar ID (always \"primary\"), event title (doctor name + patient name + reason, e.g. \"Dr. Example – John Doe – Routine Checkup\"), start time, end time, a description with notes from the call, and the patient details (caller name, phone number, reason for visit, urgency level).",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_TOOL_WORKFLOW_ID"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "operation": "book_appointment",
+            "calendar_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('calendar_id', 'Google Calendar ID. Always use \"primary\" — this hospital uses a single shared calendar for all departments and all doctors.', 'string') }}",
+            "start_time": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('start_time', 'Appointment start datetime in ISO 8601 format', 'string') }}",
+            "end_time": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('end_time', 'Appointment end datetime in ISO 8601 format (typically 1 hour after start_time)', 'string') }}",
+            "event_title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('event_title', 'Event title including doctor and patient, e.g. \"Dr. Example – John Doe – Routine Checkup\"', 'string') }}",
+            "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('description', 'Notes from the call: patient details, special requirements, follow-up instructions, etc.', 'string') }}",
+            "caller_name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('caller_name', 'Full name of the patient/caller', 'string') }}",
+            "phone_number": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('phone_number', 'Patient phone number', 'string') }}",
+            "reason_for_visit": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('reason_for_visit', 'Reason the patient is visiting the hospital', 'string') }}",
+            "urgency_level": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('urgency_level', 'Urgency of the visit: low, medium, high, or emergency', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "operation",
+              "displayName": "operation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "calendar_id",
+              "displayName": "calendar_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "start_time",
+              "displayName": "start_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "end_time",
+              "displayName": "end_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "event_title",
+              "displayName": "event_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "caller_name",
+              "displayName": "caller_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "phone_number",
+              "displayName": "phone_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reason_for_visit",
+              "displayName": "reason_for_visit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "urgency_level",
+              "displayName": "urgency_level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "appointment_datetime",
+              "displayName": "appointment_datetime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "9956d09a-686f-5447-a5bf-372e87cd2233",
+      "name": "book_appointment",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.1,
+      "position": [
+        -928,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Search the hospital knowledge base to answer questions about departments, available doctors, visiting hours, accepted insurance plans, hospital location, services offered, facilities, and any other general hospital information. Call this when the caller asks things like \"what departments do you have?\", \"what are your visiting hours?\", \"do you accept XYZ insurance?\", \"where are you located?\", or any question about the hospital itself. Do NOT use calendar IDs from this knowledge base for appointment booking — the hospital always uses \"primary\" as the calendar ID.",
+        "pineconeIndex": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_PINECONE_INDEX"
+        },
+        "options": {}
+      },
+      "id": "a780aeda-a53d-56a9-b1bc-80659f86833f",
+      "name": "hospital_knowledge_base",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        -800,
+        240
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "01f9b4b2-9672-5bc7-b594-0c239aeb2172",
+      "name": "Google Gemini Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "operation"
+            },
+            {
+              "name": "calendar_id"
+            },
+            {
+              "name": "start_time"
+            },
+            {
+              "name": "end_time"
+            },
+            {
+              "name": "event_title"
+            },
+            {
+              "name": "description"
+            },
+            {
+              "name": "caller_name"
+            },
+            {
+              "name": "phone_number"
+            },
+            {
+              "name": "reason_for_visit"
+            },
+            {
+              "name": "urgency_level"
+            },
+            {
+              "name": "appointment_datetime"
+            },
+            {
+              "name": "status"
+            }
+          ]
+        }
+      },
+      "id": "94dfb99d-550e-5a2d-b0dc-49bdb4aa7bfa",
+      "name": "When Executed as Tool",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -464,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "cond-check-avail",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $('When Executed as Tool').first().json.operation }}",
+                    "rightValue": "check_availability"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "check_availability"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "cond-log-booking",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $('When Executed as Tool').first().json.operation }}",
+                    "rightValue": "log_booking"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "log_booking"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "cond-book-appt",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $('When Executed as Tool').first().json.operation }}",
+                    "rightValue": "book_appointment"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "book_appointment"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "218f6fb8-bc1e-5504-a997-862921a98609",
+      "name": "Route Operation",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -240,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "primary"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $('When Executed as Tool').first().json.start_time }}",
+        "timeMax": "={{ $('When Executed as Tool').first().json.end_time }}",
+        "options": {
+          "orderBy": "startTime"
+        }
+      },
+      "id": "ecdc2d8c-9d6c-5e72-a0de-c6eea69590c8",
+      "name": "Get Calendar Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n// Filter out the empty placeholder item that alwaysOutputData produces\n// when the calendar has no events (it is a single item with no keys).\nconst events = items.filter(item => Object.keys(item.json).length > 0);\n\nif (events.length === 0) {\n  return [{\n    json: {\n      available: true,\n      conflicting_events_count: 0,\n      message: 'Slot is free — no conflicting events found. You may proceed to book the appointment.'\n    }\n  }];\n}\n\nconst conflicts = events.map(e => ({\n  title: e.json.summary || '(no title)',\n  start: (e.json.start && (e.json.start.dateTime || e.json.start.date)) || 'unknown',\n  end:   (e.json.end   && (e.json.end.dateTime   || e.json.end.date))   || 'unknown',\n}));\n\nreturn [{\n  json: {\n    available: false,\n    conflicting_events_count: events.length,\n    conflicting_events: conflicts,\n    message: events.length + ' conflicting event(s) found in this window. The slot is NOT available — please offer the caller an alternative time.'\n  }\n}];"
+      },
+      "id": "c0a314f4-bd11-51e8-8bc5-9724d384c308",
+      "name": "Format Availability Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_CALL_LOG_SHEET_ID"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Start Time": "={{ $('When Executed as Tool').first().json.appointment_datetime }}",
+            "Status": "={{ $('When Executed as Tool').first().json.status }}",
+            "Services / Notes": "={{ $('When Executed as Tool').first().json.reason_for_visit }}",
+            "Calendar ID": "={{ $('When Executed as Tool').first().json.calendar_id }}",
+            "Appointment Duration (mins)": "={{ $('When Executed as Tool').first().json.appointment_datetime }}",
+            "Doctor Name": "={{ $('When Executed as Tool').first().json.doctor_name }}",
+            "Gender": "={{ $('When Executed as Tool').first().json.gender }}",
+            "Department": "={{ $('When Executed as Tool').first().json.department }}",
+            "Available Days": "={{ $('When Executed as Tool').first().json.avaliable_days }}",
+            "End Time": "={{ $('When Executed as Tool').first().json.appointment_datetime }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Doctor Name",
+              "displayName": "Doctor Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Gender",
+              "displayName": "Gender",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Department",
+              "displayName": "Department",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Available Days",
+              "displayName": "Available Days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Start Time",
+              "displayName": "Start Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "End Time",
+              "displayName": "End Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Services / Notes",
+              "displayName": "Services / Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Calendar ID",
+              "displayName": "Calendar ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Appointment Duration (mins)",
+              "displayName": "Appointment Duration (mins)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "932c3c98-1c57-5ae7-b252-16f4872b9fc0",
+      "name": "Log to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "primary"
+        },
+        "start": "={{ $('When Executed as Tool').first().json.start_time }}",
+        "end": "={{ $('When Executed as Tool').first().json.end_time }}",
+        "additionalFields": {
+          "description": "={{ $('When Executed as Tool').first().json.description }}",
+          "summary": "={{ $('When Executed as Tool').first().json.event_title }}"
+        }
+      },
+      "id": "dee424ea-32c7-5df2-81ed-ad50d1d9df50",
+      "name": "Create Calendar Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_APPOINTMENT_SHEET_ID"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Caller Name": "={{ $('When Executed as Tool').first().json.caller_name }}",
+            "Phone Number": "={{ $('When Executed as Tool').first().json.phone_number }}",
+            "Reason For Visit": "={{ $('When Executed as Tool').first().json.reason_for_visit }}",
+            "Urgency Level": "={{ $('When Executed as Tool').first().json.urgency_level }}",
+            "Appointment Date Time": "={{ $('When Executed as Tool').first().json.start_time }}",
+            "Status": "confirmed",
+            "Event Title": "={{ $('When Executed as Tool').first().json.event_title }}",
+            "Start Time": "={{ $('When Executed as Tool').first().json.start_time }}",
+            "End Time": "={{ $('When Executed as Tool').first().json.end_time }}",
+            "Description": "={{ $('When Executed as Tool').first().json.description }}",
+            "Calender ID": "={{ $('When Executed as Tool').first().json.calendar_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Caller Name",
+              "displayName": "Caller Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Phone Number",
+              "displayName": "Phone Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Reason For Visit",
+              "displayName": "Reason For Visit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Urgency Level",
+              "displayName": "Urgency Level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Appointment Date Time",
+              "displayName": "Appointment Date Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Event Title",
+              "displayName": "Event Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Start Time",
+              "displayName": "Start Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "End Time",
+              "displayName": "End Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Description",
+              "displayName": "Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Calender ID",
+              "displayName": "Calender ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "b0eeb9d1-5e44-5bf6-b86e-e4a4dbf6f552",
+      "name": "Log Appointment Booking",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        272,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "admin@example.com",
+        "subject": "=New Appointment Confirmed - {{ $('When Executed as Tool').first().json.caller_name }} with {{ $('When Executed as Tool').first().json.event_title }}",
+        "message": "=Hello,<br> Demo Hospital Team,<br><br>A new appointment has been successfully booked.<br><br>Patient Name: {{ $('When Executed as Tool').first().json.caller_name }}<br>Patient Phone: {{ $('When Executed as Tool').first().json.phone_number }}<br>Appointment: {{ $('When Executed as Tool').first().json.event_title }}<br>Appointment Date: {{ $('When Executed as Tool').first().json.start_time.split('T')[0] }}<br>Appointment Time: {{ $('When Executed as Tool').first().json.start_time.split('T')[1] }}<br>Reason: {{ $('When Executed as Tool').first().json.reason_for_visit }}<br>Calendar ID: {{ $('When Executed as Tool').first().json.calendar_id }}<br><br>Booking Status: Confirmed<br><br>Please review the appointment and inform the doctor as needed.<br><br>Thank you,<br>Demo Hospital Voice Receptionist",
+        "options": {}
+      },
+      "id": "d3f7eeaf-dbbf-585e-b1e5-500761b3bea5",
+      "name": "Notify Hospital Admin",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        512,
+        384
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "get_current_date": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_availability": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log_booking": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "book_appointment": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "hospital_knowledge_base": {
+      "ai_tool": [
+        [
+          {
+            "node": "MCP Server Trigger",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "hospital_knowledge_base",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed as Tool": {
+      "main": [
+        [
+          {
+            "node": "Route Operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Operation": {
+      "main": [
+        [
+          {
+            "node": "Get Calendar Events",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Events": {
+      "main": [
+        [
+          {
+            "node": "Format Availability Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Log Appointment Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Appointment Booking": {
+      "main": [
+        [
+          {
+            "node": "Notify Hospital Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
