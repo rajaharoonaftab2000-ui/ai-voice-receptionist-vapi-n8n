@@ -154,4 +154,4 @@ Practical AI assistants and n8n workflows for business automation.
 
 ## Demo Video
 
-[Watch the AI Voice Receptionist Demo](./Hospital-Voice-Receptionist-Clean-Call-Captions.mp4)
+[Watch the AI Voice Receptionist Demo](./Hospital-Voice-Receptionist-Clean-Call.mp4)
